@@ -23,6 +23,7 @@ export interface VFSItem {
   updatedAt: string;
   isFavorite: boolean;
   isTrash: boolean;
+  isPrivate?: boolean;
   tags: string[];
   content?: string;
   exif?: {
@@ -280,6 +281,7 @@ export function addVFSFile(file: Partial<VFSItem> & { name: string }): VFSItem {
     updatedAt: new Date().toISOString(),
     isFavorite: false,
     isTrash: false,
+    isPrivate: false,
     tags: file.tags || [ext],
     content: file.content || "",
     storageDrive: file.storageDrive || "internal"
@@ -315,6 +317,12 @@ export function restoreVFSFile(id: string): VFSItem[] {
 
 export function toggleVFSFavorite(id: string): VFSItem[] {
   const files = getVFSFiles().map((f) => (f.id === id ? { ...f, isFavorite: !f.isFavorite } : f));
+  saveVFSFiles(files);
+  return files;
+}
+
+export function toggleVFSPrivate(id: string): VFSItem[] {
+  const files = getVFSFiles().map((f) => (f.id === id ? { ...f, isPrivate: !f.isPrivate } : f));
   saveVFSFiles(files);
   return files;
 }

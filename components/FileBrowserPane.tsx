@@ -55,6 +55,12 @@ export default function FileBrowserPane({
       base = base.filter((f) => !f.isTrash);
     }
 
+    if (pane.currentView === "private") {
+      base = base.filter((f) => f.isPrivate);
+    } else {
+      base = base.filter((f) => !f.isPrivate);
+    }
+
     if (pane.currentView === "favorites") {
       base = base.filter((f) => f.isFavorite);
     } else if (pane.currentView === "recent") {

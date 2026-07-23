@@ -18,6 +18,7 @@ interface CommandPaletteProps {
   onCreateFolder: () => void;
   onUploadFile: () => void;
   onOpenVaultDrop: () => void;
+  isPrivateUnlocked: boolean;
 }
 
 export default function CommandPalette({
@@ -27,7 +28,8 @@ export default function CommandPalette({
   onThemeChange,
   onCreateFolder,
   onUploadFile,
-  onOpenVaultDrop
+  onOpenVaultDrop,
+  isPrivateUnlocked
 }: CommandPaletteProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -145,7 +147,7 @@ export default function CommandPalette({
           {query.trim().length > 0 && (
             <Command.Group heading="Files" className="px-2 text-xs font-semibold text-slate-500 mb-2 mt-4">
               {files
-                .filter(f => f.name.toLowerCase().includes(query.toLowerCase()))
+                .filter(f => (!f.isPrivate || isPrivateUnlocked) && f.name.toLowerCase().includes(query.toLowerCase()))
                 .slice(0, 10)
                 .map((file) => (
                   <Command.Item 

@@ -19,7 +19,8 @@ import {
   Sparkles,
   ShieldCheck,
   Code, 
-  Folder 
+  Folder,
+  Lock
 } from "lucide-react";
 import { FileCategory, StorageDrive } from "@/lib/vfsStorage";
 import { motion, Variants } from "framer-motion";
@@ -49,7 +50,8 @@ export type NavView =
   | "favorites"
   | "trash"
   | "category"
-  | "storage";
+  | "storage"
+  | "private";
 
 interface SidebarProps {
   currentView: NavView;
@@ -138,6 +140,12 @@ export default function Sidebar({
               className={navItemClass(isSelected("trash"))}
             >
               <Trash2 className="w-4.5 h-4.5" /> Trash
+            </div>
+            <div
+              onClick={() => onNavigate("private")}
+              className={navItemClass(isSelected("private"))}
+            >
+              <Lock className="w-4.5 h-4.5 text-rose-500" /> Private Vault
             </div>
           </div>
         </div>

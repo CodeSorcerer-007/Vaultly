@@ -8,6 +8,7 @@ import SettingsModal, { AppTheme, AccentColor } from "./SettingsModal";
 import CommandPalette from "./CommandPalette";
 import ContextMenu, { ContextMenuAction } from "./ContextMenu";
 import VaultDropModal from "./VaultDropModal";
+import PasswordPromptModal from "./PasswordPromptModal";
 import FileBrowserPane, { PaneState } from "./FileBrowserPane";
 import {
   VFSItem,
@@ -20,7 +21,7 @@ import {
   addVFSFile
 } from "@/lib/vfsStorage";
 import { AnimatePresence } from "framer-motion";
-import { Eye, Sparkles, Share2, Star, Trash2 } from "lucide-react";
+import { Eye, Sparkles, Share2, Star, Trash2, Lock, Unlock } from "lucide-react";
 
 export default function DashboardClient({
   userEmail,
@@ -50,6 +51,10 @@ export default function DashboardClient({
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isVaultDropOpen, setIsVaultDropOpen] = useState(false);
   const [contextMenuData, setContextMenuData] = useState<{ x: number, y: number, file: VFSItem } | null>(null);
+  
+  // Private Vault State
+  const [isPrivateUnlocked, setIsPrivateUnlocked] = useState(false);
+  const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
 
   // Customization
   const [theme, setTheme] = useState<AppTheme>("light");
@@ -99,12 +104,17 @@ export default function DashboardClient({
   const activePane = panes.find(p => p.id === activePaneId) || panes[0];
 
   const handleNavigate = (view: NavView, category?: FileCategory, drive?: StorageDrive) => {
+    if (view === "private" && !isPrivateUnlocked) {
+      setShowPasswordPrompt(true);
+      return;
+    }
     handleUpdatePane(activePaneId, {
       currentView: view,
       selectedCategory: category,
       selectedDrive: drive,
       searchQuery: "",
-      selectedIds: []
+      selectedIds: [],
+      focusedId: undefined
     });
   };
 
@@ -190,6 +200,7 @@ export default function DashboardClient({
         onUploadFile={handleCommandUpload}
         onCreateFolder={handleCommandCreateFolder}
         onOpenVaultDrop={() => setIsVaultDropOpen(true)}
+        isPrivateUnlocked={isPrivateUnlocked}
       />
 
       {/* Navigation Sidebar */}
@@ -276,11 +287,22 @@ export default function DashboardClient({
             { label: "Preview", icon: <Eye />, onClick: (f) => setPreviewFile(f) },
             { label: "AI Summarize", icon: <Sparkles />, onClick: (f) => setPreviewFile(f) },
             { label: "Share (VaultDrop)", icon: <Share2 />, onClick: (f) => { handleUpdatePane(activePaneId, { selectedIds: [f.id] }); setIsVaultDropOpen(true); } },
+            { label: contextMenuData.file.isPrivate ? "Remove from Private" : "Move to Private Vault", icon: contextMenuData.file.isPrivate ? <Unlock /> : <Lock />, onClick: (f) => setFiles(require("@/lib/vfsStorage").toggleVFSPrivate(f.id)) },
             { label: contextMenuData.file.isFavorite ? "Unfavorite" : "Favorite", icon: <Star />, onClick: (f) => setFiles(require("@/lib/vfsStorage").toggleVFSFavorite(f.id)) },
             { label: "Delete", icon: <Trash2 />, danger: true, onClick: (f) => setFiles(require("@/lib/vfsStorage").deleteVFSFile(f.id, activePane.currentView === "trash")) }
           ]}
         />
       )}
+
+      <PasswordPromptModal
+        isOpen={showPasswordPrompt}
+        onClose={() => setShowPasswordPrompt(false)}
+        onSuccess={() => {
+          setShowPasswordPrompt(false);
+          setIsPrivateUnlocked(true);
+          handleUpdatePane(activePaneId, { currentView: "private", selectedCategory: undefined, selectedDrive: undefined });
+        }}
+      />
     </div>
   );
 }
