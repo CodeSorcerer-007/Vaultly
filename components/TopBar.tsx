@@ -18,7 +18,8 @@ import {
   FolderPlus,
   ArrowDownAZ,
   ArrowUpAZ,
-  SortDesc
+  SortDesc,
+  Lock
 } from "lucide-react";
 import { FileCategory } from "@/lib/vfsStorage";
 import { Sparkles } from "lucide-react";
@@ -45,6 +46,7 @@ interface TopBarProps {
   sortBy?: "name" | "date" | "size" | "type";
   sortOrder?: "asc" | "desc";
   onSortChange?: (by: "name" | "date" | "size" | "type", order: "asc" | "desc") => void;
+  onLockPrivateVault?: () => void;
 }
 
 export default function TopBar({
@@ -66,7 +68,8 @@ export default function TopBar({
   onClearSelection,
   sortBy,
   sortOrder,
-  onSortChange
+  onSortChange,
+  onLockPrivateVault
 }: TopBarProps) {
   return (
     <header className="sticky top-0 z-10 glass-panel border-b px-6 py-3.5 flex flex-wrap items-center justify-between gap-4">
@@ -232,6 +235,16 @@ export default function TopBar({
           >
             <FolderPlus className="w-4 h-4" /> Folder
           </button>
+
+          {/* Lock Private Vault Button */}
+          {currentPath.includes("Private") && onLockPrivateVault && (
+            <button
+              onClick={onLockPrivateVault}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-rose-200 dark:border-rose-800 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+            >
+              <Lock className="w-3.5 h-3.5" /> Lock Vault
+            </button>
+          )}
 
           {/* Upload Button */}
           <button

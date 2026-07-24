@@ -33,6 +33,7 @@ interface FileBrowserPaneProps {
   onFilesChanged: (files: VFSItem[]) => void;
   onContextMenu?: (e: React.MouseEvent, file: VFSItem) => void;
   onRename?: (id: string, newName: string) => void;
+  onLockPrivateVault?: () => void;
 }
 
 export default function FileBrowserPane({
@@ -45,7 +46,8 @@ export default function FileBrowserPane({
   onOpenAi,
   onFilesChanged,
   onContextMenu,
-  onRename
+  onRename,
+  onLockPrivateVault
 }: FileBrowserPaneProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -331,6 +333,8 @@ export default function FileBrowserPane({
       path += "/Trash";
     } else if (pane.currentView === "favorites") {
       path += "/Favorites";
+    } else if (pane.currentView === "private") {
+      path += "/Private Vault";
     }
     return path;
   }, [pane.currentPath, pane.currentView, pane.selectedCategory, pane.selectedDrive]);
@@ -391,6 +395,7 @@ export default function FileBrowserPane({
         sortBy={pane.sortBy}
         sortOrder={pane.sortOrder}
         onSortChange={(by, order) => onUpdatePane(pane.id, { sortBy: by, sortOrder: order })}
+        onLockPrivateVault={onLockPrivateVault}
       />
 
       <div className="flex-1 overflow-y-auto p-6 scrollbar-thin relative">

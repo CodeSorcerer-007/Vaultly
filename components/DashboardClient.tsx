@@ -193,6 +193,11 @@ export default function DashboardClient({
     setFiles(updateVFSFile(id, { name: newName }));
   };
 
+  const handleLockPrivateVault = () => {
+    setIsPrivateUnlocked(false);
+    handleUpdatePane(activePaneId, { currentView: "home" });
+  };
+
   return (
     <div className="flex min-h-screen bg-[var(--bg-main)] text-[var(--text-primary)] transition-colors duration-200 overflow-hidden">
       
@@ -235,6 +240,7 @@ export default function DashboardClient({
               onFilesChanged={setFiles}
               onContextMenu={handleContextMenu}
               onRename={handleRename}
+              onLockPrivateVault={handleLockPrivateVault}
             />
           ))}
         </AnimatePresence>
