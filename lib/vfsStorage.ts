@@ -26,6 +26,7 @@ export interface VFSItem {
   isPrivate?: boolean;
   tags: string[];
   content?: string;
+  blobUrl?: string;
   exif?: {
     camera?: string;
     resolution?: string;
@@ -255,6 +256,26 @@ export function saveVFSFiles(files: VFSItem[]): void {
   }
 }
 
+function generateFallbackContent(name: string, mimeType: string, size: number): string {
+  const ext = name.split(".").pop()?.toLowerCase() || "";
+  const sizeMB = (size / 1024 / 1024).toFixed(2);
+  const parts = [
+    `File: ${name}`,
+    `Type: ${mimeType}`,
+    `Size: ${sizeMB} MB`,
+  ];
+  if (["pdf"].includes(ext)) parts.push("This is a PDF document.");
+  else if (["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(ext)) parts.push("This is an image file.");
+  else if (["mp4", "mkv", "avi", "webm", "mov"].includes(ext)) parts.push("This is a video file.");
+  else if (["mp3", "flac", "wav", "aac", "ogg"].includes(ext)) parts.push("This is an audio file.");
+  else if (["zip", "rar", "tar", "gz", "7z"].includes(ext)) parts.push("This is a compressed archive.");
+  else if (["apk"].includes(ext)) parts.push("This is an Android application package.");
+  else if (["doc", "docx"].includes(ext)) parts.push("This is a Word document.");
+  else if (["xls", "xlsx"].includes(ext)) parts.push("This is a spreadsheet.");
+  else if (["ppt", "pptx"].includes(ext)) parts.push("This is a presentation file.");
+  return parts.join("\n");
+}
+
 export function addVFSFile(file: Partial<VFSItem> & { name: string }): VFSItem {
   const files = getVFSFiles();
   const ext = file.name.split(".").pop()?.toLowerCase() || "";
@@ -283,7 +304,8 @@ export function addVFSFile(file: Partial<VFSItem> & { name: string }): VFSItem {
     isTrash: false,
     isPrivate: false,
     tags: file.tags || [ext],
-    content: file.content || "",
+    content: file.content || generateFallbackContent(file.name, file.mimeType || "application/octet-stream", file.size || 0),
+    blobUrl: file.blobUrl,
     storageDrive: file.storageDrive || "internal"
   };
 

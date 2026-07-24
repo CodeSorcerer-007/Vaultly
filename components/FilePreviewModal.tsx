@@ -12,9 +12,12 @@ import {
   Info,
   Sparkles,
   Check,
-  Plus
+  Plus,
+  ExternalLink,
+  Download
 } from "lucide-react";
 import { VFSItem } from "@/lib/vfsStorage";
+import { generateLocalSummary } from "@/lib/offlineAiEngine";
 
 import { extractDominantColor } from "@/lib/colorExtractor";
 import { motion, AnimatePresence } from "framer-motion";
@@ -38,8 +41,11 @@ export default function FilePreviewModal({
   React.useEffect(() => {
     if (file) {
       extractDominantColor(file).then(setDominantColor);
+      // Reset summary when file changes
+      setAiSummary(null);
     } else {
       setDominantColor(null);
+      setAiSummary(null);
     }
   }, [file]);
 
@@ -59,24 +65,50 @@ export default function FilePreviewModal({
   };
 
   const handleGenerateSummary = async () => {
-    if (!file || !file.content) return;
+    if (!file) return;
     setIsSummarizing(true);
     setAiSummary(null);
+
+    // Build content to send — use file.content if available, otherwise metadata
+    const contentToSend = file.content && file.content.trim().length > 0
+      ? file.content
+      : `File name: ${file.name}\nType: ${file.mimeType}\nSize: ${(file.size / 1024 / 1024).toFixed(2)} MB\nCategory: ${file.category}\nTags: ${file.tags.join(", ")}`;
+
     try {
+      // Try the server API first
       const res = await fetch("/api/summarize-local", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: file.content, fileName: file.name })
+        body: JSON.stringify({ content: contentToSend, fileName: file.name })
       });
-      if (!res.ok) throw new Error("Failed to summarize");
+      if (!res.ok) throw new Error("API failed");
       const data = await res.json();
-      setAiSummary(data.summary);
-    } catch (err) {
-      setAiSummary("Could not generate summary.");
+      if (data.summary) {
+        setAiSummary(data.summary);
+        return;
+      }
+      throw new Error("Empty summary");
+    } catch {
+      // Fall back to local offline AI engine
+      try {
+        const localSummary = generateLocalSummary(file);
+        setAiSummary(localSummary);
+      } catch {
+        setAiSummary("Could not generate summary. Please try again later.");
+      }
     } finally {
       setIsSummarizing(false);
     }
   };
+
+  const handleOpenFile = () => {
+    if (file.blobUrl) {
+      window.open(file.blobUrl, "_blank");
+    }
+  };
+
+  const isOpenable = !!file.blobUrl;
+  const hasTextContent = file.content && file.content.trim().length > 0 && !file.content.startsWith("File:");
 
   return (
     <AnimatePresence>
@@ -123,12 +155,21 @@ export default function FilePreviewModal({
         {/* Modal Body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin">
           {/* Main Content / Code View */}
-          {file.content ? (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  File Preview
-                </span>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                File Preview
+              </span>
+              <div className="flex items-center gap-2">
+                {isOpenable && (
+                  <button
+                    onClick={handleOpenFile}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    Open File
+                  </button>
+                )}
                 <button
                   onClick={handleGenerateSummary}
                   disabled={isSummarizing}
@@ -138,28 +179,37 @@ export default function FilePreviewModal({
                   {isSummarizing ? "Generating..." : "Generate AI Summary"}
                 </button>
               </div>
+            </div>
 
-              {aiSummary && (
-                <div className="p-4 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 text-xs font-medium text-blue-900 dark:text-blue-200 space-y-1 animate-fade-in">
-                  <div className="flex items-center gap-1.5 font-bold">
-                    <Sparkles className="w-4 h-4 text-blue-500" /> Vaultly AI Summary
-                  </div>
-                  <p className="whitespace-pre-line leading-relaxed">{aiSummary}</p>
+            {aiSummary && (
+              <div className="p-4 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 text-xs font-medium text-blue-900 dark:text-blue-200 space-y-1 animate-fade-in">
+                <div className="flex items-center gap-1.5 font-bold">
+                  <Sparkles className="w-4 h-4 text-blue-500" /> Vaultly AI Summary
                 </div>
-              )}
+                <p className="whitespace-pre-line leading-relaxed">{aiSummary}</p>
+              </div>
+            )}
 
+            {hasTextContent ? (
               <div className="p-4 rounded-2xl bg-slate-900 text-slate-100 font-mono text-xs overflow-x-auto max-h-64 scrollbar-thin leading-relaxed">
                 <pre>{file.content}</pre>
               </div>
-            </div>
-          ) : (
-            <div className="p-8 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-dashed border-slate-200 dark:border-slate-700 text-center">
-              <ImageIcon className="w-12 h-12 text-slate-300 mx-auto mb-2" />
-              <p className="text-xs font-medium text-slate-500">
-                Binary or media file preview mode. Use default system viewers to open.
-              </p>
-            </div>
-          )}
+            ) : (
+              <div className="p-8 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-dashed border-slate-200 dark:border-slate-700 text-center space-y-3">
+                <ImageIcon className="w-12 h-12 text-slate-300 mx-auto mb-2" />
+                <p className="text-xs font-medium text-slate-500">
+                  {file.mimeType.includes("pdf") ? "PDF Document" :
+                   file.mimeType.startsWith("image/") ? "Image File" :
+                   file.mimeType.startsWith("video/") ? "Video File" :
+                   file.mimeType.startsWith("audio/") ? "Audio File" :
+                   "Binary or media file"}
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  {isOpenable ? "Click \"Open File\" above to view this file in your browser." : "Use the AI Summary button to analyze this file."}
+                </p>
+              </div>
+            )}
+          </div>
 
           {/* EXIF Metadata (If available) */}
           {file.exif && (

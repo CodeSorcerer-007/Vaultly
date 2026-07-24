@@ -13,7 +13,7 @@ import {
   Trash2
 } from "lucide-react";
 import { VFSItem, calculateStorageStats } from "@/lib/vfsStorage";
-import { generateSmartBatchNames } from "@/lib/offlineAiEngine";
+import { generateSmartBatchNames, processNaturalLanguageQuery } from "@/lib/offlineAiEngine";
 
 interface AiAssistantPanelProps {
   isOpen: boolean;
@@ -64,7 +64,7 @@ export default function AiAssistantPanel({
         body: JSON.stringify({ query: queryToUse, filesMetadata })
       });
 
-      if (!res.ok) throw new Error("Failed to get AI response");
+      if (!res.ok) throw new Error("API request failed");
 
       const data = await res.json();
       setAiResponse(data.answer);
@@ -73,8 +73,17 @@ export default function AiAssistantPanel({
         const matched = files.filter(f => data.matchedFileIds.includes(f.id));
         onSelectFiles(matched);
       }
-    } catch (err) {
-      setAiResponse("Sorry, I encountered an error while processing your request.");
+    } catch {
+      // Fall back to local offline AI engine
+      try {
+        const localResult = processNaturalLanguageQuery(queryToUse, files);
+        setAiResponse(localResult.answer);
+        if (localResult.matchedFiles.length > 0) {
+          onSelectFiles(localResult.matchedFiles);
+        }
+      } catch {
+        setAiResponse("Sorry, I encountered an error. Please try again.");
+      }
     } finally {
       setIsThinking(false);
     }

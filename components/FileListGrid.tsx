@@ -195,15 +195,13 @@ export default function FileListGrid({
                 >
                   <Eye className="w-3.5 h-3.5" />
                 </button>
-                {file.content && (
-                  <button
+                <button
                     onClick={() => onSummarize(file)}
                     className="p-1.5 rounded-lg text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
                     title="AI Summarize"
                   >
                     <Sparkles className="w-3.5 h-3.5" />
                   </button>
-                )}
                 <button
                   onClick={() => onDelete(file)}
                   className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
@@ -287,14 +285,12 @@ export default function FileListGrid({
                     >
                       <Eye className="w-3.5 h-3.5" />
                     </button>
-                    {file.content && (
-                      <button
-                        onClick={() => onSummarize(file)}
-                        className="p-1 rounded text-blue-500 hover:text-blue-700"
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+                    <button
+                      onClick={() => onSummarize(file)}
+                      className="p-1 rounded text-blue-500 hover:text-blue-700"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                    </button>
                     <button
                       onClick={() => onDelete(file)}
                       className="p-1 rounded text-slate-400 hover:text-rose-600"

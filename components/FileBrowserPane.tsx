@@ -217,23 +217,33 @@ export default function FileBrowserPane({
     const fileList = e.target.files;
     if (!fileList || fileList.length === 0) return;
 
+    const textExtensions = [".json", ".md", ".txt", ".csv", ".xml", ".html", ".htm", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".log", ".sh", ".bat", ".ps1"];
+    const isTextLike = (file: File) => {
+      if (file.type.startsWith("text/")) return true;
+      return textExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+    };
+
     Array.from(fileList).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        const textContent = typeof evt.target?.result === "string" ? evt.target.result : undefined;
-        const autoTags = autoTagDocument(file.name, textContent);
-        
-        addVFSFile({
-          name: file.name,
-          size: file.size,
-          mimeType: file.type || "application/octet-stream",
-          content: textContent,
-          storageDrive: pane.selectedDrive || "internal",
-          tags: autoTags
-        });
-        onFilesChanged(getVFSFiles());
-      };
-      if (file.type.startsWith("text/") || file.name.endsWith(".json") || file.name.endsWith(".md")) {
+      // Create a blob URL for opening/previewing the file
+      const blobUrl = URL.createObjectURL(file);
+
+      if (isTextLike(file)) {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          const textContent = typeof evt.target?.result === "string" ? evt.target.result : undefined;
+          const autoTags = autoTagDocument(file.name, textContent);
+          
+          addVFSFile({
+            name: file.name,
+            size: file.size,
+            mimeType: file.type || "application/octet-stream",
+            content: textContent,
+            blobUrl,
+            storageDrive: pane.selectedDrive || "internal",
+            tags: autoTags
+          });
+          onFilesChanged(getVFSFiles());
+        };
         reader.readAsText(file);
       } else {
         const autoTags = autoTagDocument(file.name);
@@ -241,6 +251,7 @@ export default function FileBrowserPane({
           name: file.name,
           size: file.size,
           mimeType: file.type || "application/octet-stream",
+          blobUrl,
           storageDrive: pane.selectedDrive || "internal",
           tags: autoTags
         });
