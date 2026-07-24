@@ -15,7 +15,10 @@ import {
   Moon,
   Sun,
   X,
-  FolderPlus
+  FolderPlus,
+  ArrowDownAZ,
+  ArrowUpAZ,
+  SortDesc
 } from "lucide-react";
 import { FileCategory } from "@/lib/vfsStorage";
 import { Sparkles } from "lucide-react";
@@ -39,6 +42,9 @@ interface TopBarProps {
   onBatchFavorite: () => void;
   onBatchRename: () => void;
   onClearSelection: () => void;
+  sortBy?: "name" | "date" | "size" | "type";
+  sortOrder?: "asc" | "desc";
+  onSortChange?: (by: "name" | "date" | "size" | "type", order: "asc" | "desc") => void;
 }
 
 export default function TopBar({
@@ -57,7 +63,10 @@ export default function TopBar({
   onBatchDelete,
   onBatchFavorite,
   onBatchRename,
-  onClearSelection
+  onClearSelection,
+  sortBy,
+  sortOrder,
+  onSortChange
 }: TopBarProps) {
   return (
     <header className="sticky top-0 z-10 glass-panel border-b px-6 py-3.5 flex flex-wrap items-center justify-between gap-4">
@@ -155,6 +164,28 @@ export default function TopBar({
               <option value="archives">Archives</option>
             </select>
             <Filter className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+
+          {/* Sort Filter */}
+          <div className="relative hidden md:flex items-center gap-1 bg-slate-100 dark:bg-slate-800 rounded-xl px-2 py-1">
+            <SortDesc className="w-4 h-4 text-slate-400" />
+            <select
+              value={sortBy || "date"}
+              onChange={(e) => onSortChange?.(e.target.value as any, sortOrder || "desc")}
+              className="appearance-none bg-transparent border-none text-xs font-medium text-slate-600 dark:text-slate-300 cursor-pointer outline-none w-20"
+            >
+              <option value="name">Name</option>
+              <option value="date">Date</option>
+              <option value="size">Size</option>
+              <option value="type">Type</option>
+            </select>
+            <button
+              onClick={() => onSortChange?.(sortBy || "date", sortOrder === "asc" ? "desc" : "asc")}
+              className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+              title="Toggle Sort Order"
+            >
+              {sortOrder === "asc" ? <ArrowUpAZ className="w-4 h-4" /> : <ArrowDownAZ className="w-4 h-4" />}
+            </button>
           </div>
 
           {/* View Mode Switcher */}

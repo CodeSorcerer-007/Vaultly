@@ -18,6 +18,8 @@ export type PaneState = {
   selectedIds: string[];
   focusedId?: string;
   currentPath?: string;
+  sortBy?: "name" | "date" | "size" | "type";
+  sortOrder?: "asc" | "desc";
 };
 
 interface FileBrowserPaneProps {
@@ -30,6 +32,7 @@ interface FileBrowserPaneProps {
   onOpenAi: () => void;
   onFilesChanged: (files: VFSItem[]) => void;
   onContextMenu?: (e: React.MouseEvent, file: VFSItem) => void;
+  onRename?: (id: string, newName: string) => void;
 }
 
 export default function FileBrowserPane({
@@ -41,7 +44,8 @@ export default function FileBrowserPane({
   onPreview,
   onOpenAi,
   onFilesChanged,
-  onContextMenu
+  onContextMenu,
+  onRename
 }: FileBrowserPaneProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -76,11 +80,24 @@ export default function FileBrowserPane({
         query: pane.searchQuery,
         inTrash: pane.currentView === "trash"
       });
-      return searchRes.map((r) => r.item);
+      base = searchRes.map((r) => r.item);
+    }
+
+    // Apply Sorting
+    if (pane.sortBy) {
+      base = [...base].sort((a, b) => {
+        let compare = 0;
+        if (pane.sortBy === "name") compare = a.name.localeCompare(b.name);
+        else if (pane.sortBy === "date") compare = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        else if (pane.sortBy === "size") compare = a.size - b.size;
+        else if (pane.sortBy === "type") compare = a.mimeType.localeCompare(b.mimeType);
+        
+        return pane.sortOrder === "desc" ? -compare : compare;
+      });
     }
 
     return base;
-  }, [allFiles, pane.currentView, pane.selectedCategory, pane.selectedDrive, pane.searchQuery, pane.isSemanticSearch]);
+  }, [allFiles, pane.currentView, pane.selectedCategory, pane.selectedDrive, pane.searchQuery, pane.isSemanticSearch, pane.sortBy, pane.sortOrder]);
 
   // Semantic Search Effect
   const [semanticResults, setSemanticResults] = React.useState<VFSItem[]>([]);
@@ -223,43 +240,72 @@ export default function FileBrowserPane({
       return textExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
     };
 
-    Array.from(fileList).forEach((file) => {
-      // Create a blob URL for opening/previewing the file
-      const blobUrl = URL.createObjectURL(file);
+    Array.from(fileList).forEach((file) => processFile(file));
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
-      if (isTextLike(file)) {
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-          const textContent = typeof evt.target?.result === "string" ? evt.target.result : undefined;
-          const autoTags = autoTagDocument(file.name, textContent);
-          
-          addVFSFile({
-            name: file.name,
-            size: file.size,
-            mimeType: file.type || "application/octet-stream",
-            content: textContent,
-            blobUrl,
-            storageDrive: pane.selectedDrive || "internal",
-            tags: autoTags
-          });
-          onFilesChanged(getVFSFiles());
-        };
-        reader.readAsText(file);
-      } else {
-        const autoTags = autoTagDocument(file.name);
+  const processFile = (file: File) => {
+    const textExtensions = [".json", ".md", ".txt", ".csv", ".xml", ".html", ".htm", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".log", ".sh", ".bat", ".ps1"];
+    const isTextLike = (file: File) => {
+      if (file.type.startsWith("text/")) return true;
+      return textExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+    };
+
+    const blobUrl = URL.createObjectURL(file);
+    if (isTextLike(file)) {
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const textContent = typeof evt.target?.result === "string" ? evt.target.result : undefined;
+        const autoTags = autoTagDocument(file.name, textContent);
+        
         addVFSFile({
           name: file.name,
           size: file.size,
           mimeType: file.type || "application/octet-stream",
+          content: textContent,
           blobUrl,
           storageDrive: pane.selectedDrive || "internal",
           tags: autoTags
         });
         onFilesChanged(getVFSFiles());
-      }
-    });
+      };
+      reader.readAsText(file);
+    } else {
+      const autoTags = autoTagDocument(file.name);
+      addVFSFile({
+        name: file.name,
+        size: file.size,
+        mimeType: file.type || "application/octet-stream",
+        blobUrl,
+        storageDrive: pane.selectedDrive || "internal",
+        tags: autoTags
+      });
+      onFilesChanged(getVFSFiles());
+    }
+  };
 
-    if (fileInputRef.current) fileInputRef.current.value = "";
+  const [isDraggingOver, setIsDraggingOver] = React.useState(false);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      Array.from(e.dataTransfer.files).forEach(file => processFile(file));
+    }
   };
 
   const handleCreateFolder = () => {
@@ -297,10 +343,23 @@ export default function FileBrowserPane({
       exit={{ opacity: 0, scale: 0.98 }}
       transition={{ duration: 0.2 }}
       onClick={() => onSelectPane(pane.id)}
-      className={`flex-1 flex flex-col min-w-[320px] transition-all duration-200 border-l ${
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className={`relative flex-1 flex flex-col min-w-[320px] transition-all duration-200 border-l ${
         isActive ? "border-transparent shadow-[0_0_20px_rgba(0,0,0,0.05)] z-10" : "border-slate-200 dark:border-slate-800 opacity-90 scale-[0.99]"
       }`}
     >
+      {isDraggingOver && (
+        <div className="absolute inset-0 z-50 bg-blue-500/10 backdrop-blur-[2px] border-4 border-dashed border-blue-500 rounded-3xl m-4 flex flex-col items-center justify-center pointer-events-none transition-all">
+          <div className="w-20 h-20 bg-blue-100 dark:bg-blue-900/50 rounded-full flex items-center justify-center mb-4 shadow-xl">
+            <svg className="w-10 h-10 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+          </div>
+          <h3 className="text-2xl font-bold text-blue-600 dark:text-blue-400">Drop files to upload</h3>
+        </div>
+      )}
       <input
         type="file"
         ref={fileInputRef}
@@ -329,6 +388,9 @@ export default function FileBrowserPane({
         onClearSelection={() => onUpdatePane(pane.id, { selectedIds: [] })}
         isSemanticSearch={pane.isSemanticSearch || false}
         onSemanticSearchToggle={(val) => onUpdatePane(pane.id, { isSemanticSearch: val })}
+        sortBy={pane.sortBy}
+        sortOrder={pane.sortOrder}
+        onSortChange={(by, order) => onUpdatePane(pane.id, { sortBy: by, sortOrder: order })}
       />
 
       <div className="flex-1 overflow-y-auto p-6 scrollbar-thin relative">
@@ -360,6 +422,7 @@ export default function FileBrowserPane({
             onDelete={handleDelete}
             onSummarize={onPreview}
             onContextMenu={onContextMenu}
+            onRename={onRename}
           />
         )}
       </div>

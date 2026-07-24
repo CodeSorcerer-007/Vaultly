@@ -12,8 +12,8 @@ import {
   Zap,
   Trash2
 } from "lucide-react";
-import { VFSItem, calculateStorageStats } from "@/lib/vfsStorage";
-import { generateSmartBatchNames, processNaturalLanguageQuery } from "@/lib/offlineAiEngine";
+import { VFSItem, calculateStorageStats, updateVFSFile, deleteVFSFile } from "@/lib/vfsStorage";
+import { generateSmartBatchNames, processNaturalLanguageQuery, autoTagDocument } from "@/lib/offlineAiEngine";
 
 interface AiAssistantPanelProps {
   isOpen: boolean;
@@ -32,7 +32,7 @@ export default function AiAssistantPanel({
 }: AiAssistantPanelProps) {
   const [nlQuery, setNlQuery] = useState("");
   const [aiResponse, setAiResponse] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"search" | "cleanup" | "rename">("search");
+  const [activeTab, setActiveTab] = useState<"search" | "cleanup" | "rename" | "autotag">("search");
   const [batchPrefix, setBatchPrefix] = useState("Project_File");
   const [isThinking, setIsThinking] = useState(false);
 
@@ -90,11 +90,46 @@ export default function AiAssistantPanel({
   };
 
   const handleBatchRenamePreview = () => {
-    const renamed = generateSmartBatchNames(files.slice(0, 5), batchPrefix);
+    const subset = files.filter(f => !f.isTrash).slice(0, 10);
+    const renamed = generateSmartBatchNames(subset, batchPrefix);
     setAiResponse(
-      `Batch Rename Preview (${files.length} items):\n` +
+      `Batch Rename Preview (${subset.length} items):\n` +
         renamed.map((r) => `• ${r.oldName} ➔ ${r.newName}`).join("\n")
     );
+  };
+
+  const applyBatchRename = () => {
+    const subset = files.filter(f => !f.isTrash).slice(0, 10);
+    const renamed = generateSmartBatchNames(subset, batchPrefix);
+    renamed.forEach(r => {
+       updateVFSFile(r.id, { name: r.newName });
+    });
+    onBatchActionSuccess();
+    setAiResponse(`Successfully renamed ${renamed.length} files.`);
+  };
+
+  const applyDeleteJunk = () => {
+    if (stats.junkFiles.length === 0) return;
+    stats.junkFiles.forEach(f => {
+       deleteVFSFile(f.id, true);
+    });
+    onBatchActionSuccess();
+    setAiResponse(`Successfully deleted ${stats.junkFiles.length} junk files.`);
+  };
+
+  const applyAutoTag = () => {
+    let count = 0;
+    files.forEach(f => {
+       if (!f.isTrash) {
+          const tags = autoTagDocument(f.name, f.content);
+          if (tags.length > 0) {
+            updateVFSFile(f.id, { tags: Array.from(new Set([...f.tags, ...tags])) });
+            count++;
+          }
+       }
+    });
+    onBatchActionSuccess();
+    setAiResponse(`Successfully auto-tagged ${count} files.`);
   };
 
   return (
@@ -149,6 +184,16 @@ export default function AiAssistantPanel({
           }`}
         >
           Batch Rename
+        </button>
+        <button
+          onClick={() => setActiveTab("autotag")}
+          className={`flex-1 py-3 text-center border-b-2 transition-colors ${
+            activeTab === "autotag"
+              ? "border-blue-600 text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900"
+              : "border-transparent text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          Auto-Tag
         </button>
       </div>
 
@@ -226,16 +271,19 @@ export default function AiAssistantPanel({
                 </button>
               </div>
 
-              <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/40 text-rose-900 dark:text-rose-200">
-                <span className="text-[11px] font-semibold text-rose-700 dark:text-rose-400">
-                  Junk & Log Files
-                </span>
-                <p className="text-lg font-bold mt-0.5">{stats.junkFiles.length} Files</p>
+              <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/40 text-rose-900 dark:text-rose-200 flex flex-col items-start justify-between">
+                <div>
+                  <span className="text-[11px] font-semibold text-rose-700 dark:text-rose-400">
+                    Junk & Log Files
+                  </span>
+                  <p className="text-lg font-bold mt-0.5">{stats.junkFiles.length} Files</p>
+                </div>
                 <button
-                  onClick={() => onSelectFiles(stats.junkFiles)}
-                  className="mt-2 text-[11px] font-semibold text-rose-700 underline"
+                  onClick={applyDeleteJunk}
+                  disabled={stats.junkFiles.length === 0}
+                  className="mt-2 text-[11px] font-semibold text-rose-700 underline disabled:opacity-50"
                 >
-                  Inspect Junk
+                  Delete All Junk
                 </button>
               </div>
             </div>
@@ -256,11 +304,37 @@ export default function AiAssistantPanel({
                 className="w-full px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-transparent focus:border-blue-500 text-xs text-slate-800 dark:text-slate-200 outline-none"
               />
             </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleBatchRenamePreview}
+                className="flex-1 py-2 px-4 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-semibold shadow-sm hover:opacity-95"
+              >
+                Preview
+              </button>
+              <button
+                onClick={applyBatchRename}
+                className="flex-1 py-2 px-4 rounded-xl accent-bg text-white text-xs font-semibold shadow-sm hover:opacity-95"
+              >
+                Apply Rename
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 4: Auto-Tag */}
+        {activeTab === "autotag" && (
+          <div className="space-y-4 text-center p-4">
+            <h4 className="text-sm font-bold text-slate-700 dark:text-slate-200">
+              AI Smart Tagging
+            </h4>
+            <p className="text-xs text-slate-500">
+              Vaultly AI can analyze all your files and automatically assign relevant tags based on content and metadata.
+            </p>
             <button
-              onClick={handleBatchRenamePreview}
-              className="w-full py-2 px-4 rounded-xl accent-bg text-white text-xs font-semibold shadow-sm hover:opacity-95"
+              onClick={applyAutoTag}
+              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-semibold shadow-md shadow-indigo-500/25 transition-all duration-200 hover:scale-[1.02]"
             >
-              Generate Rename Preview
+              <Sparkles className="w-3.5 h-3.5 inline mr-1.5" /> Start Auto-Tagging
             </button>
           </div>
         )}

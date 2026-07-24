@@ -16,7 +16,7 @@ import {
   ExternalLink,
   Download
 } from "lucide-react";
-import { VFSItem } from "@/lib/vfsStorage";
+import { VFSItem, downloadVFSFile } from "@/lib/vfsStorage";
 import { generateLocalSummary } from "@/lib/offlineAiEngine";
 
 import { extractDominantColor } from "@/lib/colorExtractor";
@@ -107,8 +107,73 @@ export default function FilePreviewModal({
     }
   };
 
+  const handleDownloadFile = () => {
+    downloadVFSFile(file);
+  };
+
   const isOpenable = !!file.blobUrl;
   const hasTextContent = file.content && file.content.trim().length > 0 && !file.content.startsWith("File:");
+
+  const renderPreviewContent = () => {
+    if (file.mimeType.startsWith("image/") && file.blobUrl) {
+      return (
+        <div className="flex justify-center p-2 bg-slate-100 dark:bg-slate-900/50 rounded-2xl">
+          <img src={file.blobUrl} alt={file.name} className="max-w-full max-h-[60vh] object-contain rounded-lg shadow-sm" />
+        </div>
+      );
+    }
+    
+    if (file.mimeType.startsWith("video/") && file.blobUrl) {
+      return (
+        <div className="flex justify-center bg-black rounded-2xl overflow-hidden">
+          <video src={file.blobUrl} controls className="w-full max-h-[60vh]" />
+        </div>
+      );
+    }
+    
+    if (file.mimeType.startsWith("audio/") && file.blobUrl) {
+      return (
+        <div className="p-6 bg-slate-100 dark:bg-slate-800/50 rounded-2xl flex flex-col items-center gap-4">
+          <div className="w-16 h-16 rounded-full bg-blue-100 text-blue-500 flex items-center justify-center">
+            <FileText className="w-8 h-8" />
+          </div>
+          <audio src={file.blobUrl} controls className="w-full max-w-md" />
+        </div>
+      );
+    }
+    
+    if (file.mimeType === "application/pdf" && file.blobUrl) {
+      return (
+        <div className="h-[60vh] w-full rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700">
+          <iframe src={file.blobUrl} className="w-full h-full bg-white" title={file.name} />
+        </div>
+      );
+    }
+    
+    if (hasTextContent) {
+      return (
+        <div className="p-4 rounded-2xl bg-slate-900 text-slate-100 font-mono text-xs overflow-x-auto max-h-[60vh] scrollbar-thin leading-relaxed">
+          <pre>{file.content}</pre>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="p-8 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-dashed border-slate-200 dark:border-slate-700 text-center space-y-3">
+        <ImageIcon className="w-12 h-12 text-slate-300 mx-auto mb-2" />
+        <p className="text-xs font-medium text-slate-500">
+          {file.mimeType.includes("pdf") ? "PDF Document" :
+           file.mimeType.startsWith("image/") ? "Image File" :
+           file.mimeType.startsWith("video/") ? "Video File" :
+           file.mimeType.startsWith("audio/") ? "Audio File" :
+           "Binary or media file"}
+        </p>
+        <p className="text-[11px] text-slate-400">
+          {isOpenable ? "Click \"Open File\" above to view this file in your browser." : "Use the AI Summary button to analyze this file."}
+        </p>
+      </div>
+    );
+  };
 
   return (
     <AnimatePresence>
@@ -144,12 +209,21 @@ export default function FilePreviewModal({
               <p className="text-xs text-slate-400 font-mono">{file.path}</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={handleDownloadFile}
+              className="p-2 rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              title="Download"
+            >
+              <Download className="w-5 h-5" />
+            </button>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Modal Body */}
@@ -190,25 +264,7 @@ export default function FilePreviewModal({
               </div>
             )}
 
-            {hasTextContent ? (
-              <div className="p-4 rounded-2xl bg-slate-900 text-slate-100 font-mono text-xs overflow-x-auto max-h-64 scrollbar-thin leading-relaxed">
-                <pre>{file.content}</pre>
-              </div>
-            ) : (
-              <div className="p-8 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-dashed border-slate-200 dark:border-slate-700 text-center space-y-3">
-                <ImageIcon className="w-12 h-12 text-slate-300 mx-auto mb-2" />
-                <p className="text-xs font-medium text-slate-500">
-                  {file.mimeType.includes("pdf") ? "PDF Document" :
-                   file.mimeType.startsWith("image/") ? "Image File" :
-                   file.mimeType.startsWith("video/") ? "Video File" :
-                   file.mimeType.startsWith("audio/") ? "Audio File" :
-                   "Binary or media file"}
-                </p>
-                <p className="text-[11px] text-slate-400">
-                  {isOpenable ? "Click \"Open File\" above to view this file in your browser." : "Use the AI Summary button to analyze this file."}
-                </p>
-              </div>
-            )}
+            {renderPreviewContent()}
           </div>
 
           {/* EXIF Metadata (If available) */}

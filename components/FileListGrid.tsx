@@ -18,7 +18,7 @@ import {
   MoreVertical,
   Check
 } from "lucide-react";
-import { VFSItem } from "@/lib/vfsStorage";
+import { VFSItem, downloadVFSFile } from "@/lib/vfsStorage";
 import { ViewMode } from "./TopBar";
 import { motion, AnimatePresence, Variants } from "framer-motion";
 
@@ -49,6 +49,7 @@ interface FileListGridProps {
   onDelete: (file: VFSItem) => void;
   onSummarize: (file: VFSItem) => void;
   onContextMenu?: (e: React.MouseEvent, file: VFSItem) => void;
+  onRename?: (id: string, newName: string) => void;
 }
 
 export default function FileListGrid({
@@ -62,8 +63,28 @@ export default function FileListGrid({
   onFavorite,
   onDelete,
   onSummarize,
-  onContextMenu
+  onContextMenu,
+  onRename
 }: FileListGridProps) {
+  const [editingFileId, setEditingFileId] = React.useState<string | null>(null);
+  const [editValue, setEditValue] = React.useState("");
+
+  const startEditing = (file: VFSItem) => {
+    setEditingFileId(file.id);
+    setEditValue(file.name);
+  };
+
+  const handleRenameSubmit = (fileId: string) => {
+    if (onRename && editValue.trim() !== "") {
+      onRename(fileId, editValue.trim());
+    }
+    setEditingFileId(null);
+  };
+
+  const handleDownload = (file: VFSItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    downloadVFSFile(file);
+  };
   if (files.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center p-12 text-center my-12 animate-fade-in">
@@ -178,9 +199,31 @@ export default function FileListGrid({
                 <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800/80 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform duration-200">
                   {getFileIcon(file)}
                 </div>
-                <h4 className="text-xs font-semibold text-slate-800 dark:text-slate-200 line-clamp-1 w-full px-1">
-                  {file.name}
-                </h4>
+                {editingFileId === file.id ? (
+                  <input
+                    autoFocus
+                    type="text"
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onBlur={() => handleRenameSubmit(file.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleRenameSubmit(file.id);
+                      if (e.key === "Escape") setEditingFileId(null);
+                    }}
+                    className="text-xs font-semibold text-slate-800 dark:text-slate-200 w-full px-1 bg-transparent border-b border-blue-500 focus:outline-none text-center"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                ) : (
+                  <h4 
+                    className="text-xs font-semibold text-slate-800 dark:text-slate-200 line-clamp-1 w-full px-1"
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      startEditing(file);
+                    }}
+                  >
+                    {file.name}
+                  </h4>
+                )}
                 <span className="text-[11px] font-medium text-slate-400 mt-1">
                   {formatSize(file.size)} • {formatDate(file.createdAt)}
                 </span>
@@ -202,6 +245,13 @@ export default function FileListGrid({
                   >
                     <Sparkles className="w-3.5 h-3.5" />
                   </button>
+                <button
+                  onClick={(e) => handleDownload(file, e)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors"
+                  title="Download File"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                </button>
                 <button
                   onClick={() => onDelete(file)}
                   className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
@@ -266,7 +316,31 @@ export default function FileListGrid({
                     className="p-3 font-semibold text-slate-800 dark:text-slate-200 cursor-pointer flex items-center gap-2.5"
                   >
                     {getFileIcon(file)}
-                    <span className="hover:underline line-clamp-1">{file.name}</span>
+                    {editingFileId === file.id ? (
+                      <input
+                        autoFocus
+                        type="text"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        onBlur={() => handleRenameSubmit(file.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleRenameSubmit(file.id);
+                          if (e.key === "Escape") setEditingFileId(null);
+                        }}
+                        className="bg-transparent border-b border-blue-500 focus:outline-none flex-1"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    ) : (
+                      <span 
+                        className="hover:underline line-clamp-1 flex-1"
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          startEditing(file);
+                        }}
+                      >
+                        {file.name}
+                      </span>
+                    )}
                   </td>
                   <td className="p-3 capitalize text-slate-500">{file.category}</td>
                   <td className="p-3 text-slate-500">{formatSize(file.size)}</td>
@@ -334,9 +408,31 @@ export default function FileListGrid({
                 {getFileIcon(file)}
               </div>
               <div className="min-w-0 flex-1 cursor-pointer" onClick={() => onPreview(file)}>
-                <h4 className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
-                  {file.name}
-                </h4>
+                {editingFileId === file.id ? (
+                  <input
+                    autoFocus
+                    type="text"
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onBlur={() => handleRenameSubmit(file.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleRenameSubmit(file.id);
+                      if (e.key === "Escape") setEditingFileId(null);
+                    }}
+                    className="text-xs font-semibold text-slate-800 dark:text-slate-200 w-full bg-transparent border-b border-blue-500 focus:outline-none"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                ) : (
+                  <h4 
+                    className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate"
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      startEditing(file);
+                    }}
+                  >
+                    {file.name}
+                  </h4>
+                )}
                 <span className="text-[11px] text-slate-400">
                   {formatSize(file.size)} • {file.path}
                 </span>
@@ -355,6 +451,13 @@ export default function FileListGrid({
                 className="p-1.5 text-slate-400 hover:text-slate-700"
               >
                 <Eye className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={(e) => handleDownload(file, e)}
+                className="p-1.5 text-slate-400 hover:text-indigo-600"
+                title="Download"
+              >
+                <Download className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={() => onDelete(file)}

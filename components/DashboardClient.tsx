@@ -21,7 +21,7 @@ import {
   addVFSFile
 } from "@/lib/vfsStorage";
 import { AnimatePresence } from "framer-motion";
-import { Eye, Sparkles, Share2, Star, Trash2, Lock, Unlock } from "lucide-react";
+import { Eye, Sparkles, Share2, Star, Trash2, Lock, Unlock, Edit2, Download } from "lucide-react";
 
 export default function DashboardClient({
   userEmail,
@@ -189,6 +189,10 @@ export default function DashboardClient({
     setFiles(getVFSFiles());
   };
 
+  const handleRename = (id: string, newName: string) => {
+    setFiles(updateVFSFile(id, { name: newName }));
+  };
+
   return (
     <div className="flex min-h-screen bg-[var(--bg-main)] text-[var(--text-primary)] transition-colors duration-200 overflow-hidden">
       
@@ -205,6 +209,7 @@ export default function DashboardClient({
 
       {/* Navigation Sidebar */}
       <Sidebar
+        files={files}
         currentView={activePane.currentView}
         selectedCategory={activePane.selectedCategory}
         selectedDrive={activePane.selectedDrive}
@@ -229,6 +234,7 @@ export default function DashboardClient({
               onOpenAi={() => setIsAiOpen(true)}
               onFilesChanged={setFiles}
               onContextMenu={handleContextMenu}
+              onRename={handleRename}
             />
           ))}
         </AnimatePresence>
@@ -285,6 +291,8 @@ export default function DashboardClient({
           onClose={() => setContextMenuData(null)}
           actions={[
             { label: "Preview", icon: <Eye />, onClick: (f) => setPreviewFile(f) },
+            { label: "Rename", icon: <Edit2 />, onClick: (f) => { const newName = prompt("Enter new name:", f.name); if (newName) handleRename(f.id, newName); } },
+            { label: "Download", icon: <Download />, onClick: (f) => require("@/lib/vfsStorage").downloadVFSFile(f) },
             { label: "AI Summarize", icon: <Sparkles />, onClick: (f) => setPreviewFile(f) },
             { label: "Share (VaultDrop)", icon: <Share2 />, onClick: (f) => { handleUpdatePane(activePaneId, { selectedIds: [f.id] }); setIsVaultDropOpen(true); } },
             { label: contextMenuData.file.isPrivate ? "Remove from Private" : "Move to Private Vault", icon: contextMenuData.file.isPrivate ? <Unlock /> : <Lock />, onClick: (f) => setFiles(require("@/lib/vfsStorage").toggleVFSPrivate(f.id)) },

@@ -37,6 +37,16 @@ export function processNaturalLanguageQuery(query: string, files: VFSItem[]): Ai
     };
   }
 
+  if (q.includes("rename") || q.includes("organize") || q.includes("sort")) {
+    // Return all files or a subset for renaming
+    const matched = files.filter(f => !f.isTrash).slice(0, 5); // Just 5 as an example
+    return {
+      answer: `I can help you rename your files. Here are some files you might want to rename.`,
+      matchedFiles: matched,
+      actionSuggested: "rename"
+    };
+  }
+
   if (q.includes("large") || q.includes("big") || q.includes("heavy")) {
     const stats = calculateStorageStats(files);
     return {
@@ -70,6 +80,22 @@ export function generateLocalSummary(file: VFSItem): string {
   
   if (file.category === "code") {
     return "This is a source code file. It appears to define structures, variables, or UI components for a software project.";
+  }
+
+  if (file.category === "images") {
+    return `This is an image file (${file.mimeType}). Judging by its tags (${file.tags.join(', ')}), it likely depicts visual content related to those topics.`;
+  }
+
+  if (file.category === "videos") {
+    return `This is a video file. It is a media format that may contain motion picture and audio.`;
+  }
+
+  if (file.category === "audio") {
+    return `This is an audio track (${file.mimeType}). It could be music, a podcast, or a recording.`;
+  }
+
+  if (file.category === "archives") {
+    return `This is a compressed archive. It is used to bundle multiple files into a single, smaller package.`;
   }
 
   if (content.includes("invoice") || content.includes("total amount due")) {

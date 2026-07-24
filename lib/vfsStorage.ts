@@ -6,6 +6,12 @@ export type FileCategory =
   | "archives"
   | "apks"
   | "code"
+  | "spreadsheets"
+  | "presentations"
+  | "ebooks"
+  | "fonts"
+  | "3d"
+  | "executables"
   | "other";
 
 export type StorageDrive = "internal" | "external" | "usb";
@@ -271,8 +277,12 @@ function generateFallbackContent(name: string, mimeType: string, size: number): 
   else if (["zip", "rar", "tar", "gz", "7z"].includes(ext)) parts.push("This is a compressed archive.");
   else if (["apk"].includes(ext)) parts.push("This is an Android application package.");
   else if (["doc", "docx"].includes(ext)) parts.push("This is a Word document.");
-  else if (["xls", "xlsx"].includes(ext)) parts.push("This is a spreadsheet.");
-  else if (["ppt", "pptx"].includes(ext)) parts.push("This is a presentation file.");
+  else if (["xls", "xlsx", "ods", "csv"].includes(ext)) parts.push("This is a spreadsheet.");
+  else if (["ppt", "pptx", "odp", "key"].includes(ext)) parts.push("This is a presentation file.");
+  else if (["epub", "mobi", "azw", "djvu"].includes(ext)) parts.push("This is an ebook.");
+  else if (["ttf", "otf", "woff", "woff2"].includes(ext)) parts.push("This is a font file.");
+  else if (["obj", "stl", "gltf", "fbx", "blend"].includes(ext)) parts.push("This is a 3D model.");
+  else if (["exe", "msi", "dmg", "deb", "rpm"].includes(ext)) parts.push("This is an executable installer.");
   return parts.join("\n");
 }
 
@@ -284,7 +294,13 @@ export function addVFSFile(file: Partial<VFSItem> & { name: string }): VFSItem {
   if (["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(ext)) category = "images";
   else if (["mp4", "mkv", "avi", "webm", "mov"].includes(ext)) category = "videos";
   else if (["mp3", "flac", "wav", "aac", "ogg"].includes(ext)) category = "audio";
-  else if (["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "md"].includes(ext)) category = "documents";
+  else if (["pdf", "doc", "docx", "txt", "md"].includes(ext)) category = "documents";
+  else if (["xls", "xlsx", "ods", "csv"].includes(ext)) category = "spreadsheets";
+  else if (["ppt", "pptx", "odp", "key"].includes(ext)) category = "presentations";
+  else if (["epub", "mobi", "azw", "djvu"].includes(ext)) category = "ebooks";
+  else if (["ttf", "otf", "woff", "woff2"].includes(ext)) category = "fonts";
+  else if (["obj", "stl", "gltf", "fbx", "blend"].includes(ext)) category = "3d";
+  else if (["exe", "msi", "dmg", "deb", "rpm"].includes(ext)) category = "executables";
   else if (["zip", "rar", "tar", "gz", "7z"].includes(ext)) category = "archives";
   else if (["apk"].includes(ext)) category = "apks";
   else if (["js", "ts", "jsx", "tsx", "kt", "java", "py", "c", "cpp", "h", "json", "html", "css", "sql"].includes(ext)) category = "code";
@@ -318,6 +334,71 @@ export function updateVFSFile(id: string, updates: Partial<VFSItem>): VFSItem[] 
   const files = getVFSFiles().map((f) => (f.id === id ? { ...f, ...updates, updatedAt: new Date().toISOString() } : f));
   saveVFSFiles(files);
   return files;
+}
+
+export function moveVFSFile(id: string, newFolder: string): VFSItem[] {
+  return updateVFSFile(id, { folder: newFolder, path: `${newFolder}/${getVFSFiles().find(f => f.id === id)?.name}` });
+}
+
+export function downloadVFSFile(file: VFSItem) {
+  let url = file.blobUrl;
+  let shouldRevoke = false;
+
+  if (!url) {
+    if (file.content) {
+      const blob = new Blob([file.content], { type: file.mimeType });
+      url = URL.createObjectURL(blob);
+      shouldRevoke = true;
+    } else {
+      console.error("No content or blobUrl available for download");
+      return;
+    }
+  }
+
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = file.name;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  
+  if (shouldRevoke) {
+    URL.revokeObjectURL(url);
+  }
+}
+
+export interface FolderNode {
+  name: string;
+  path: string;
+  children: FolderNode[];
+  fileCount: number;
+}
+
+export function getFolderTree(files: VFSItem[]): FolderNode {
+  const root: FolderNode = { name: "Root", path: "/", children: [], fileCount: 0 };
+  
+  files.forEach(file => {
+    if (file.isTrash) return;
+    
+    const parts = file.folder.split('/').filter(Boolean);
+    let current = root;
+    let currentPath = "";
+    
+    parts.forEach(part => {
+      currentPath += `/${part}`;
+      let child = current.children.find(c => c.name === part);
+      
+      if (!child) {
+        child = { name: part, path: currentPath, children: [], fileCount: 0 };
+        current.children.push(child);
+      }
+      
+      current = child;
+    });
+    current.fileCount++;
+  });
+  
+  return root;
 }
 
 export function deleteVFSFile(id: string, permanent: boolean = false): VFSItem[] {
